@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이 구역의 러닝왕 - 팀전 & GPS 연동</title>
+    <style>
+        :root {
+            --primary-color: #ffcb05; 
+            --blue-team: #3b4cca;
+            --red-team: #ff0000;
+            --dark-bg: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #ffffff;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--dark-bg); color: var(--text-color); padding: 15px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        
+        header { text-align: center; margin-bottom: 20px; }
+        header h1 { color: var(--primary-color); font-size: 1.6rem; text-shadow: 2px 2px #000; }
+        header p { color: #aaa; font-size: 0.85rem; margin-top: 5px; }
+
+        .card { background-color: var(--card-bg); border-radius: 15px; padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 2px solid #333; }
+        .card h2 { font-size: 1.1rem; margin-bottom: 12px; color: var(--primary-color); display: flex; align-items: center; gap: 8px; }
+
+        /* 팀 선택 섹션 */
+        .team-select-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn-team { flex: 1; padding: 10px; border: 2px solid #444; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; background: #2a2a2a; transition: 0.2s; }
+        .btn-team.blue.selected { background-color: var(--blue-team); border-color: #fff; }
+        .btn-team.red.selected { background-color: var(--red-team); border-color: #fff; }
+
+        /* 페이스메이커 패널 */
+        .pacemaker-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 12px; }
+        .stat-box { background: #2a2a2a; padding: 10px; border-radius: 8px; }
+        .stat-box .label { font-size: 0.7rem; color: #888; }
+        .stat-box .value { font-size: 1.2rem; font-weight: bold; color: #fff; margin-top: 4px; }
+        
+        .controls { display: flex; gap: 10px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.95rem; transition: 0.2s; }
+        .btn-start { background-color: #4CAF50; color: white; }
+        .btn-stop { background-color: #f44336; color: white; }
+        .btn-sim { background-color: #ff9800; color: white; }
+        button:hover { opacity: 0.9; transform: scale(0.98); }
+
+        /* 구역 점령전 (팀전) 섹션 */
+        .gym-card { background: linear-gradient(135deg, #1e1e2f, #2c2c3e); border: 2px solid var(--blue-team); transition: border-color 0.5s; }
+        .gym-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .gym-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; color: white; background-color: var(--blue-team); }
+        
+        .team-score-board { display: flex; justify-content: space-between; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 0.9rem; text-align: center; }
+        .team-score-box { flex: 1; }
+        .team-score-box.blue { color: #5c6bc0; border-right: 1px solid #444; }
+        .team-score-box.red { color: #ef5350; }
+        .team-score-box span { font-weight: bold; font-size: 1.1rem; display: block; margin-top: 2px; }
+
+        .challenger-status { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 0.85rem; }
+        .progress-bar-container { background: #444; border-radius: 10px; height: 10px; width: 100%; overflow: hidden; margin-top: 6px; }
+        .progress-bar { background-color: var(--primary-color); height: 100%; width: 0%; transition: width 0.3s ease; }
+
+        .taunt-box { background: rgba(255, 203, 5, 0.1); border-left: 4px solid var(--primary-color); padding: 10px; font-size: 0.8rem; margin-top: 10px; border-radius: 0 8px 8px 0; color: #ffeb3b; }
+        .gps-status { font-size: 0.75rem; color: #888; text-align: center; margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>⚡ 이 구역의 러닝왕 [팀전]</h1>
+        <p>실제 GPS와 팀 대항전으로 동네 체육관을 점령하세요!</p>
+    </header>
+
+    <!-- 0. 팀 선택 -->
+    <div class="card">
+        <h2>🛡️ 내 진영 선택</h2>
+        <div class="team-select-group">
+            <button class="btn-team blue selected" onclick="setTeam('blue')">💙 블루 팀 (미스틱)</button>
+            <button class="btn-team red" onclick="setTeam('red')">❤️ 레드 팀 (발로)</button>
+        </div>
+    </div>
+
+    <!-- 1. 실시간 페이스메이커 & GPS -->
+    <div class="card">
+        <h2>🏃‍♂️ 페이스메이커 & 실시간 트래킹</h2>
+        <div class="pacemaker-stats">
+            <div class="stat-box">
+                <div class="label">이동 거리</div>
+                <div class="value" id="distance">0.00 km</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">현재 페이스</div>
+                <div class="value" id="pace">0'00"</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">운동 시간</div>
+                <div class="value" id="timer">00:00</div>
+            </div>
+        </div>
+        <div class="controls">
+            <button class="btn-start" onclick="toggleRun()">GPS 러닝 시작</button>
+            <button class="btn-sim" onclick="toggleSimulate()">실내 시뮬레이션</button>
+        </div>
+        <div class="gps-status" id="gpsStatus">GPS 상태: 대기 중 (시작 버튼을 누르세요)</div>
+    </div>
+
+    <!-- 2. 구역 점령전 (팀전) -->
+    <div class="card gym-card" id="gymCard">
+        <div class="gym-header">
+            <h2>👑 [신부동 공원 체육관]</h2>
+            <span class="gym-badge" id="gymOwnerBadge">블루팀 지배 중</span>
+        </div>
+        
+        <div class="team-score-board">
+            <div class="team-score-box blue">
+                💙 블루 팀 합산
+                <span id="blueTeamTotal">5.20 km</span>
+            </div>
+            <div class="team-score-box red">
+                ❤️ 레드 팀 합산
+                <span id="redTeamTotal">4.80 km</span>
+            </div>
+        </div>
+
+        <div class="challenger-status">
+            <p>내 오늘 기여 거리: <strong id="myContribution">0.00</strong> km</p>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="gymProgressBar"></div>
+            </div>
+        </div>
+
+        <div class="taunt-box" id="tauntMessage">
+            💬 블루팀이 우세합니다! 레드팀을 저지하고 구역을 사수하세요!
+        </div>
+    </div>
+</div>
+
+<script>
+    let isRunning = false;
+    let isSimulating = false;
+    let seconds = 0;
+    let myDistanceMeters = 0;
+    let timerInterval = null;
+    let watchId = null;
+    let lastLat = null;
+    let lastLon = null;
+
+    // 팀 설정 ('blue' 또는 'red')
+    let myTeam = 'blue';
+
+    // 팀별 누적 거리 (시뮬레이션 및 예시 데이터 포함)
+    let teamScores = {
+        blue: 5.20,
+        red: 4.80
+    };
+
+    function setTeam(team) {
+        myTeam = team;
+        document.querySelectorAll('.btn-team').forEach(btn => btn.classList.remove('selected'));
+        if (team === 'blue') {
+            document.querySelector('.btn-team.blue').classList.add('selected');
+        } else {
+            document.querySelector('.btn-team.red').classList.add('selected');
+        }
+        updateGymStatus();
+    }
+
+    function toggleRun() {
+        if (isSimulating) toggleSimulate(); // 시뮬레이션 중이면 끔
+        
+        isRunning = !isRunning;
+        const btn = document.querySelector('.btn-start');
+        const gpsStatus = document.getElementById('gpsStatus');
+
+        if (isRunning) {
+            btn.textContent = "러닝 일시정지";
+            btn.className = "btn-stop";
+            
+            if ("geolocation" in navigator) {
+                gpsStatus.textContent = "GPS 상태: 위성 신호 탐색 중...";
+                watchId = navigator.geolocation.watchPosition(successGPS, errorGPS, {
+                    enableHighAccuracy: true,
+                    maximumAge: 1000,
+                    timeout: 10000
+                });
+                startTimer();
+            } else {
+                gpsStatus.textContent = "GPS 상태: 이 기기에서 위치 정보를 지원하지 않습니다.";
+                isRunning = false;
+                btn.textContent = "GPS 러닝 시작";
+                btn.className = "btn-start";
+            }
+        } else {
+            stopRun();
+        }
+    }
+
+    function stopRun() {
+        isRunning = false;
+        if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+        stopTimer();
+        document.querySelector('.btn-start').textContent = "GPS 러닝 시작";
+        document.querySelector('.btn-start').className = "btn-start";
+        document.getElementById('gpsStatus').textContent = "GPS 상태: 러닝이 종료되었습니다.";
+    }
+
+    // 시뮬레이션 모드 (실내에서 테스트용)
+    function toggleSimulate() {
+        if (isRunning) stopRun();
+        
+        isSimulating = !isSimulating;
+        const btn = document.querySelector('.btn-sim');
+        const gpsStatus = document.getElementById('gpsStatus');
+
+        if (isSimulating) {
+            btn.textContent = "시뮬레이션 중지";
+            gpsStatus.textContent = "GPS 상태: [실내 시뮬레이션 모드 작동 중]";
+            startTimer();
+            timerInterval = setInterval(() => {
+                seconds++;
+                myDistanceMeters += 3.0; // 1초당 3미터 증가 (~5분 페이스)
+                updateAll();
+            }, 1000);
+        } else {
+            btn.textContent = "실내 시뮬레이션";
+            clearInterval(timerInterval);
+            gpsStatus.textContent = "GPS 상태: 시뮬레이션 종료";
+        }
+    }
+
+    function startTimer() {
+        if (!isSimulating) {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                seconds++;
+                updateAll();
+            }, 1000);
+        }
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+    }
+
+    // 실제 GPS 위치 수신 성공 시
+    function successGPS(position) {
+        document.getElementById('gpsStatus').textContent = "GPS 상태: 신호 안정적 연결됨 🟢";
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        if (lastLat !== null && lastLon !== null) {
+            const distanceDelta = calculateDistance(lastLat, lastLon, lat, lon);
+            // 너무 튀는 값(GPS 오차) 방지: 1초에 10미터 이상 순간 이동은 무시
+            if (distanceDelta < 15) {
+                myDistanceMeters += distanceDelta;
+            }
+        }
+        lastLat = lat;
+        lastLon = lon;
+        updateAll();
+    }
+
+    function errorGPS(error) {
+        document.getElementById('gpsStatus').textContent = `GPS 오류: ${error.message} (위치 권한을 확인해주세요)`;
+    }
+
+    // 두 위경도 간의 거리 계산 (Haversine formula - 단위: 미터)
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3; // 지구 반경 (m)
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180;
+        const Δλ = (lon2-lon1) * Math.PI/180;
+
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                  Math.cos(φ1) * Math.cos(φ2) *
+                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+        return R * c;
+    }
+
+    function updateAll() {
+        // 시간 포맷
+        const min = String(Math.floor(seconds / 60)).padStart(2, '0');
+        const sec = String(seconds % 60).padStart(2, '0');
+        document.getElementById('timer').textContent = `${min}:${sec}`;
+
+        // 거리 포맷
+        const km = (myDistanceMeters / 1000).toFixed(2);
+        document.getElementById('distance').textContent = `${km} km`;
+        document.getElementById('myContribution').textContent = km;
+
+        // 페이스 계산 (시뮬레이션 또는 대략치)
+        if (seconds > 0 && myDistanceMeters > 0) {
+            const paceSec = (seconds / (myDistanceMeters / 1000));
+            const pMin = Math.floor(paceSec / 60);
+            const pSec = Math.floor(paceSec % 60);
+            document.getElementById('pace').textContent = `${pMin}'${String(pSec).padStart(2, '0')}"`;
+        }
+
+        // 팀 점수 실시간 반영 (내가 움직인 거리가 내 팀 점수에 합산됨)
+        teamScores[myTeam] = parseFloat((5.20 + (myDistanceMeters / 1000)).toFixed(2));
+        
+        updateGymStatus();
+    }
+
+    function updateGymStatus() {
+        document.getElementById('blueTeamTotal').textContent = `${teamScores.blue.toFixed(2)} km`;
+        document.getElementById('redTeamTotal').textContent = `${teamScores.red.toFixed(2)} km`;
+
+        const badge = document.getElementById('gymOwnerBadge');
+        const card = document.getElementById('gymCard');
+        const taunt = document.getElementById('tauntMessage');
+        const progressBar = document.getElementById('gymProgressBar');
+
+        // 우세 팀 판정
+        let leadingTeam = teamScores.blue >= teamScores.red ? 'blue' : 'red';
+        let totalSum = teamScores.blue + teamScores.red;
+        let bluePercent = totalSum > 0 ? (teamScores.blue / totalSum) * 100 : 50;
+
+        if (leadingTeam === 'blue') {
+            badge.textContent = "블루팀 지배 중";
+            badge.style.backgroundColor = "var(--blue-team)";
+            card.style.borderColor = "var(--blue-team)";
+            progressBar.style.backgroundColor = "#5c6bc0";
+            progressBar.style.width = `${bluePercent}%`;
+        } else {
+            badge.textContent = "레드팀 지배 중";
+            badge.style.backgroundColor = "var(--red-team)";
+            card.style.borderColor = "var(--red-team)";
+            progressBar.style.backgroundColor = "#ef5350";
+            progressBar.style.width = `${bluePercent}%`;
+        }
+
+        // 도발 메시지
+        if (myTeam === leadingTeam) {
+            taunt.textContent = `🔥 내가 속한 진영이 이 구역을 지배하고 있습니다! 기세를 몰아 방어선을 구축하세요!`;
+        } else {
+            taunt.textContent = `🚨 상대 진영이 구역을 점령했습니다! 페이스를 올려 탈환하세요!`;
+        }
+    }
+</script>
+
+</body>
+</html>
